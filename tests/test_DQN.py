@@ -2,9 +2,8 @@ from agents.DQN import DQN
 import gym
 from networks.base_network import StandardNN
 
-agent = DQN()
 
-env = gym.make('CartPole-v1')
+env = gym.make("CartPole-v1")
 
 try:
     n_obs = env.reset().size
@@ -18,9 +17,10 @@ network1 = StandardNN(n_obs, n_actions)
 buffer_size = 128
 agent = DQN(network1, n_actions, env, buffer_size)
 
+
 def test_transition_sampling():
     """
-    Checks FI-FO works & buffer size is met 
+    Checks FI-FO works & buffer size is met
     """
     for i in range(buffer_size):
         agent.transitions.appendleft(i)
