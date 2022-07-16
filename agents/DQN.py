@@ -51,7 +51,8 @@ class DQN(nn.Module):
         self.reward_averages: list[list[float]] = []
         self.action_counts = {i: 0 for i in range(self.n_actions)}
         self.mini_batch_size = mini_batch_size
-        self.transitions: deque[List[Any]] = deque([], maxlen=buffer_size)
+        self.buffer_size = buffer_size
+        self.transitions: deque[List[Any]] = deque([], maxlen=self.buffer_size)
 
     def update_epsilon(self, train):
         pass

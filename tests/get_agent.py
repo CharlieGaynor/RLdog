@@ -2,12 +2,13 @@ from agents.DQN import DQN
 import gym
 from networks.base_network import StandardNN
 
-def get_agent() -> DQN:
+
+def grab_agent() -> DQN:
     """
     Instantiates agent for testing
     """
 
-    env = gym.make("CartPole-v1")
+    env = gym.make("CartPole-v1", new_step_api=True)
 
     try:
         n_obs = env.reset().size  # type: ignore

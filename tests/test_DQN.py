@@ -1,6 +1,7 @@
-from get_agent import get_agent #  type: ignore
+from tests.get_agent import grab_agent
 
-agent = get_agent()
+agent = grab_agent()
+
 
 def test_transition_sampling():
     """
