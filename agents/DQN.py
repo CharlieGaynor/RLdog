@@ -154,12 +154,12 @@ class DQN(nn.Module):
                 plot_results(total_rewards)
                 print('Action counts', self.evaluation_action_counts)
                 print('Mean reward', sum(total_rewards) / len(total_rewards))
+                
         else:
             while games_to_play > 1:
                 self._play_game()
                 if self.network_needs_updating():
                     self.update_network()
-                    self.steps_without_update = 0
                 games_to_play -= 1
             if verbose:
                 total_rewards = [i[-1] for i in self.reward_averages]
@@ -201,7 +201,9 @@ class DQN(nn.Module):
         self.update_action_counts(Counter(actions.flatten().tolist()))
 
         if self.network_needs_updating():
+            self.steps_without_update -= self.mini_batch_size
             self.update_network()
+            
 
     def update_action_counts(self, new_action_counts):
 

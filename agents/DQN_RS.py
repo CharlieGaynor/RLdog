@@ -15,6 +15,9 @@ class DQN_RS(DQN):
     """
     DQN but with random sampling instead
     """
+    
+    def __init__(self, config):
+        DQN.__init__(self, config)
 
     def network_needs_updating(self) -> bool:
         """For DQN with random sampling, network needs updating every mini_batch steps"""
