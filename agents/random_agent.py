@@ -1,6 +1,3 @@
-import torch
-from torch import nn
-import numpy as np
 import random
 from base_agent import agent_template
 
@@ -22,7 +19,7 @@ class random_agent(agent_template):
         """
         Return random action :D
         """
-        return random.randint(0, self.n_actions-1)
+        return random.randint(0, self.n_actions - 1)
 
     def update_network(self, *kwargs, **args):
         pass

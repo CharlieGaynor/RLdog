@@ -1,20 +1,15 @@
-import os
-import sys
-from typing import Any, List, Tuple, Union
+from typing import List, Any
 import torch
 from torch import nn
 import numpy as np
-import pickle
-import copy
-from agents.base_agent import agent_template
 from collections import deque
 import gym
 import constants as const
-from networks.base_network import StandardNN
 from collections import Counter
+from networks import base_network as bn
 
-## at the minute using epislon greedy - could generalise this out into a seperate class
-## priority is having mini batches
+# at the minute using epislon greedy - could generalise this out into a seperate class
+# priority is having mini batches
 
 
 class DQN(nn.Module):
@@ -29,7 +24,7 @@ class DQN(nn.Module):
 
     def __init__(
         self,
-        network: nn,
+        network: bn.StandardNN,
         n_actions: int,
         env: gym.Env,
         max_games: int = 10000,
@@ -38,8 +33,7 @@ class DQN(nn.Module):
         alpha: float = 0.5,
         min_epsilon: float = 0.2,
         mini_batch_size=1,
-        buffer_size = 128
-
+        buffer_size=128,
     ):
 
         super().__init__()
@@ -49,22 +43,20 @@ class DQN(nn.Module):
         self.opt = torch.optim.Adam(self.network.parameters(), lr=lr)
         self.epsilon = 1
         self.max_games = max_games
-        self.epsilon_decay = min_epsilon **( 1 / max_games)
+        self.epsilon_decay = min_epsilon ** (1 / max_games)
         self.min_epsilon = min_epsilon
         self.env = env
         self.alpha = alpha
         self.gamma = 0.99
-        self.reward_averages = []
+        self.reward_averages: list[list[float]] = []
         self.action_counts = {i: 0 for i in range(self.n_actions)}
         self.mini_batch_size = mini_batch_size
-        self.transitions: deque[
-            Tuple[torch.Tensor, Union[int, float], float, torch.Tensor, bool]
-        ] = deque([], maxlen=buffer_size)
+        self.transitions: deque[List[Any]] = deque([], maxlen=buffer_size)
 
     def update_epsilon(self, train):
         pass
 
-    def get_action(self, state: torch.FloatTensor, train: bool = False):
+    def get_action(self, state: torch.Tensor, train: bool = False):
         """Sample actions with epsilon-greedy policy"""
         q_values = self.network(state)
 
@@ -79,18 +71,20 @@ class DQN(nn.Module):
 
     def _play_game(self) -> None:
         """Plays out one game"""
-        next_obs = self.env.reset()
+        next_obs: np.ndarray = self.env.reset()  # type: ignore
         done = False
         rewards = []
         while not done:
             obs = next_obs
             action = self.get_action(torch.tensor(obs))
-            next_obs, reward, done, info = self.env.step(action)
+            next_obs, reward, done, _ = self.env.step(action)  # type: ignore
             rewards.append(reward)
-            self.transitions.appendleft([obs.tolist(), [action], [reward], next_obs.tolist(), [done]])
-            
+            self.transitions.appendleft(
+                [obs.tolist(), [action], [reward], next_obs.tolist(), [done]]
+            )
+
         self.epsilon *= self.epsilon_decay
-        self.reward_averages.append([0, sum(rewards)])
+        self.reward_averages.append([0.0, sum(rewards)])
 
     def _play_games(self, games_to_play: int) -> None:
 
@@ -100,14 +94,12 @@ class DQN(nn.Module):
                 self.update_network()
             games_to_play -= 1
 
-
-
     def network_needs_updating(self) -> bool:
         """For standard DQN, network needs updated if self.transitions contains more than
         self.mini_batch_size items"""
         return len(self.transitions) >= self.mini_batch_size
 
-    def sample_experiences(self) -> np.array:
+    def sample_experiences(self) -> np.ndarray:
         """
         Returns list of experiences with dimensions [mini_batch_size]
         """
@@ -121,9 +113,13 @@ class DQN(nn.Module):
     def update_network(self):
 
         experiences = self.sample_experiences()  # shape [mini_batch_size]
-        obs, actions, rewards, next_obs, done = self.extract_transition_attributes_from_experiences(
-            experiences
-        )
+        (
+            obs,
+            actions,
+            rewards,
+            next_obs,
+            done,
+        ) = self.extract_transition_attributes_from_experiences(experiences)
         loss = self.compute_loss(obs, actions, rewards, next_obs, done)
         self.opt.zero_grad()
         loss.backward()
@@ -138,10 +134,13 @@ class DQN(nn.Module):
 
         for key, val in new_action_counts.items():
             self.action_counts[key] += val
+
     def compute_loss(self, obs, actions, rewards, next_obs, done):
 
         current_q_vals = self.calculate_current_q_values(obs, actions)
-        target_q_vals = self.calculate_target_q_values(current_q_vals, rewards, next_obs, done)
+        target_q_vals = self.calculate_target_q_values(
+            current_q_vals, rewards, next_obs, done
+        )
 
         loss = torch.mean((target_q_vals - current_q_vals) ** 2)
         return loss
@@ -155,7 +154,7 @@ class DQN(nn.Module):
 
         next_q_vals = self.network(next_obs)
         target_q_vals_max = torch.max(next_q_vals, dim=-1).values
-  
+
         # What should the Q values be updated to for the actions we took?
         target_q_vals = (
             current_q_vals * (1 - self.alpha)
@@ -164,7 +163,6 @@ class DQN(nn.Module):
         )
         return target_q_vals
 
-
     @staticmethod
     def calculate_actioned_q_values(q_vals, actions):
         return q_vals[range(q_vals.shape[0]), actions.flatten()]
@@ -172,12 +170,16 @@ class DQN(nn.Module):
     @staticmethod
     def extract_transition_attributes_from_experiences(experiences):
 
-        arr_to_tensor = lambda arr: torch.tensor(list(arr))
+        arr_to_tensor = lambda arr: torch.tensor(list(arr))  # noqa: E731
 
-        obs = arr_to_tensor(experiences[:, const.ATTRIBUTE_TO_INDEX['obs']])
-        actions = arr_to_tensor(experiences[:, const.ATTRIBUTE_TO_INDEX['actions']])
-        rewards = arr_to_tensor(experiences[:, const.ATTRIBUTE_TO_INDEX['rewards']])
-        next_obs = arr_to_tensor(experiences[:, const.ATTRIBUTE_TO_INDEX['next_obs']])
-        done = arr_to_tensor(experiences[:, const.ATTRIBUTE_TO_INDEX['done']])
+        extract_att = lambda att: arr_to_tensor(  # noqa: E731
+            experiences[:, const.ATTRIBUTE_TO_INDEX[att]]
+        )
+
+        obs = extract_att("obs")
+        actions = extract_att("actions")
+        rewards = extract_att("rewards")
+        next_obs = extract_att("next_obs")
+        done = extract_att("done")
 
         return obs, actions, rewards, next_obs, done

@@ -1,8 +1,6 @@
+#  type: ignore
 import torch
 from torch import nn
-import numpy as np
-import pickle
-import copy
 from agents.base_agent import agent_template
 
 
@@ -59,7 +57,6 @@ class eg_model(nn.Module, agent_template):
 
     # def update_network(self):
 
-
     def update_network_old(
         self,
         states: torch.FloatTensor,
@@ -75,7 +72,8 @@ class eg_model(nn.Module, agent_template):
 
         self.opt.zero_grad()
         loss = self.compute_loss(
-            states, actions, rewards, next_states, done, alpha, gamma)
+            states, actions, rewards, next_states, done, alpha, gamma
+        )
         loss.backward()
         self.opt.step()
 
@@ -102,19 +100,20 @@ class eg_model(nn.Module, agent_template):
         # Shape [n_actions, game_length -1]
         next_q_values = self.forward(next_states)
         next_q_values_max = torch.max(
-            next_q_values, dim=-1).values  # Shape [game_length -1]
+            next_q_values, dim=-1
+        ).values  # Shape [game_length -1]
 
         q_values_updated = q_values.detach().clone()
 
-        changed_q_values = q_values_updated[range(
-            q_values.shape[0]), actions.flatten()]
+        changed_q_values = q_values_updated[range(q_values.shape[0]), actions.flatten()]
 
-        new_q_values = changed_q_values * \
-            (1 - alpha) + alpha * rewards.flatten() + \
-            alpha * gamma * next_q_values_max
+        new_q_values = (
+            changed_q_values * (1 - alpha)
+            + alpha * rewards.flatten()
+            + alpha * gamma * next_q_values_max
+        )
 
-        q_values_updated[range(q_values.shape[0]),
-                         actions.flatten()] = new_q_values
+        q_values_updated[range(q_values.shape[0]), actions.flatten()] = new_q_values
 
         # Shape [n_actions, game_length]
         loss = (q_values - q_values_updated) ** 2

@@ -1,8 +1,3 @@
-import torch
-from torch import nn
-import numpy as np
-import random
-
 class agent_template:
     """Random agent, who randomly picks one of the discrete options available"""
 

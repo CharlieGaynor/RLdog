@@ -1,9 +1,7 @@
+#  type: ignore
 import torch
 from torch import nn
 import numpy as np
-from icecream import ic
-import pickle
-import copy
 from base_agent import agent_template
 
 
@@ -92,24 +90,28 @@ class pg_model(nn.Module, agent_template):
         done (torch.array[game_length]): 1 if the state is the finished one
         """
         probabilities = self.forward(states)
-        relevant_probabilities = probabilities.gather(dim=1, index=actions.long().view(-1, 1)).squeeze()
+        relevant_probabilities = probabilities.gather(
+            dim=1, index=actions.long().view(-1, 1)
+        ).squeeze()
         g_t = self.calculate_g_t(rewards, gamma)
 
         # if not isinstance(g_t, torch.Tensor):
         #     print('here')
         #     g_t = self.calculate_g_t(rewards, gamma, verbose = True)
 
-        loss = - torch.sum(torch.log(relevant_probabilities) * g_t)
+        loss = -torch.sum(torch.log(relevant_probabilities) * g_t)
 
         if torch.isnan(loss):
-            print('probabilities:', probabilities)
-            print('relevant_probs', relevant_probabilities)
-            print('g_t', g_t)
+            print("probabilities:", probabilities)
+            print("relevant_probs", relevant_probabilities)
+            print("g_t", g_t)
             print(loss)
         return loss  # shape [1], loss over whole game
 
     @staticmethod
-    def calculate_g_t(rewards: torch.FloatTensor, gamma: float, verbose: bool = False) -> torch.FloatTensor:
+    def calculate_g_t(
+        rewards: torch.FloatTensor, gamma: float, verbose: bool = False
+    ) -> torch.FloatTensor:
 
         g_t = []
 
@@ -129,4 +131,8 @@ class pg_model(nn.Module, agent_template):
         #     ic(gamma)
         #     ic(max_g)
 
-        return torch.FloatTensor(g_t) / max_g if max_g != torch.tensor(0.) else torch.FloatTensor(g_t)
+        return (
+            torch.FloatTensor(g_t) / max_g
+            if max_g != torch.tensor(0.0)
+            else torch.FloatTensor(g_t)
+        )
