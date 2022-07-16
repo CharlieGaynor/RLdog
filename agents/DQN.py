@@ -63,6 +63,7 @@ class DQN(nn.Module):
         self.transitions: deque[List[Any]] = deque([], maxlen=self.buffer_size)
         self.evaluation_mode = False
         self.state_is_discrete = state_type == "DISCRETE"
+        self.steps_without_update = 0
 
     def update_epsilon(self):
         if self.games_played < self.games_to_decay_epsilon_for:
@@ -108,6 +109,7 @@ class DQN(nn.Module):
         self.update_epsilon()
         self.reward_averages.append([0.0, sum(rewards)])
         self.games_played += 1
+        self.steps_without_update += len(rewards)
 
     def _evaluate_game(self):
         """
@@ -156,6 +158,7 @@ class DQN(nn.Module):
                 self._play_game()
                 if self.network_needs_updating():
                     self.update_network()
+                    self.steps_without_update = 0
                 games_to_play -= 1
 
     def network_needs_updating(self) -> bool:
