@@ -1,3 +1,4 @@
+#  type: ignore
 import random
 from base_agent import agent_template
 
