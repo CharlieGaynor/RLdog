@@ -1,4 +1,4 @@
-from typing import List, Any
+from typing import List, Any, Dict
 import torch
 from torch import nn
 import numpy as np
@@ -7,6 +7,8 @@ import gym
 import constants as const
 from collections import Counter
 from networks import base_network
+from networks.standard_network import standardNN
+from supporting_functions.plotters import plot_results
 
 # at the minute using epislon greedy - could generalise this out into a seperate class
 # priority is having mini batches
@@ -22,48 +24,43 @@ class DQN(nn.Module):
         epsilon_decay (float, optional): Multiplication factor for epsilon
     """
 
-    def __init__(
-        self,
-        network: base_network.baseNN,
-        n_actions: int,
-        n_obs: int,
-        env: gym.Env,
-        max_games: int = 10000,
-        games_to_decay_epsilon_for: int = 10000,
-        lr: float = 1e-1,
-        alpha: float = 0.01,
-        gamma: float = 0.99,
-        min_epsilon: float = 0.2,
-        mini_batch_size=1,
-        buffer_size=128,
-        state_type: str = "DISCRETE",
-    ):
+    def __init__(self, config: Dict["str", Dict["str", Any]]):
 
         super().__init__()
 
-        self.network = network
-        self.n_actions = n_actions
-        self.n_obs = n_obs
-        self.opt = torch.optim.Adam(self.network.parameters(), lr=lr)
+        self.metadata = config["metadata"]
+        self.n_actions = self.metadata["n_actions"]
+        self.n_obs = self.metadata["n_obs"]
+        self.network = standardNN(self.n_obs, self.n_actions)
+        self.env = self.metadata["env"]
+        self.state_type = self.metadata["state_type"]
+
+        self.hyperparameters = config["hyperparameters"]
+        self.opt = torch.optim.Adam(
+            self.network.parameters(), lr=self.hyperparameters["lr"]
+        )
         self.epsilon: float = 1
-        self.max_games = max_games
-        self.games_to_decay_epsilon_for = games_to_decay_epsilon_for
-        self.games_played = 0
-        self.epsilon_decay = min_epsilon ** (1 / games_to_decay_epsilon_for)
-        self.min_epsilon = min_epsilon
-        self.env = env
-        self.alpha = alpha
-        self.gamma = gamma
-        self.reward_averages: list[list[float]] = []
-        self.evaluation_reward_averages: list[list[float]] = []
+        self.max_games = self.hyperparameters["max_games"]
+        self.games_to_decay_epsilon_for = self.hyperparameters[
+            "games_to_decay_epsilon_for"
+        ]
+        self.min_epsilon = self.hyperparameters["min_epsilon"]
+        self.alpha = self.hyperparameters["alpha"]
+        self.gamma = self.hyperparameters["gamma"]
+        self.mini_batch_size = self.hyperparameters["mini_batch_size"]
+        self.buffer_size = self.hyperparameters["buffer_size"]
+
+        self.epsilon_decay = self.min_epsilon ** (1 / self.games_to_decay_epsilon_for)
         self.action_counts = {i: 0 for i in range(self.n_actions)}
         self.evaluation_action_counts = {i: 0 for i in range(self.n_actions)}
-        self.mini_batch_size = mini_batch_size
-        self.buffer_size = buffer_size
+        self.state_is_discrete = self.state_type == "DISCRETE"
+
         self.transitions: deque[List[Any]] = deque([], maxlen=self.buffer_size)
+        self.reward_averages: list[list[float]] = []
+        self.evaluation_reward_averages: list[list[float]] = []
         self.evaluation_mode = False
-        self.state_is_discrete = state_type == "DISCRETE"
         self.steps_without_update = 0
+        self.games_played = 0
 
     def update_epsilon(self):
         if self.games_played < self.games_to_decay_epsilon_for:
@@ -144,7 +141,7 @@ class DQN(nn.Module):
         else:
             return torch.tensor(obs, dtype=torch.float32)
 
-    def play_games(self, max_games: int = 0) -> None:
+    def play_games(self, max_games: int = 0, verbose: bool = False) -> None:
 
         games_to_play = self.max_games if max_games == 0 else max_games
 
@@ -152,7 +149,11 @@ class DQN(nn.Module):
             while games_to_play > 1:
                 self._evaluate_game()
                 games_to_play -= 1
-
+            if verbose:
+                total_rewards = [i[-1] for i in self.evaluation_reward_averages]
+                plot_results(total_rewards)
+                print('Action counts', self.evaluation_action_counts)
+                print('Mean reward', sum(total_rewards) / len(total_rewards))
         else:
             while games_to_play > 1:
                 self._play_game()
@@ -160,6 +161,11 @@ class DQN(nn.Module):
                     self.update_network()
                     self.steps_without_update = 0
                 games_to_play -= 1
+            if verbose:
+                total_rewards = [i[-1] for i in self.reward_averages]
+                plot_results(total_rewards)
+                
+        
 
     def network_needs_updating(self) -> bool:
         """For standard DQN, network needs updated if self.transitions contains more than
