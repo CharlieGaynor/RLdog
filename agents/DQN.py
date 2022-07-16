@@ -78,7 +78,7 @@ class DQN(nn.Module):
         while not done:
             obs = next_obs
             action = self.get_action(torch.tensor(obs))
-            next_obs, reward, done, _ = self.env.step(action)  # type: ignore
+            next_obs, reward, done, _, _ = self.env.step(action)  # type: ignore
             rewards.append(reward)
             self.transitions.appendleft(
                 [obs.tolist(), [action], [reward], next_obs.tolist(), [done]]

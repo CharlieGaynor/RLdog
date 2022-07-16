@@ -8,6 +8,7 @@ def grab_agent() -> DQN:
     Instantiates agent for testing
     """
 
+    #  Use the new step API, which returns a truncated observation
     env = gym.make("CartPole-v1", new_step_api=True)
 
     try:
