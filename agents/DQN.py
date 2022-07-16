@@ -6,7 +6,7 @@ from collections import deque
 import gym
 import constants as const
 from collections import Counter
-from networks import base_network as bn
+from networks import base_network
 
 # at the minute using epislon greedy - could generalise this out into a seperate class
 # priority is having mini batches
@@ -24,45 +24,60 @@ class DQN(nn.Module):
 
     def __init__(
         self,
-        network: bn.StandardNN,
+        network: base_network.baseNN,
         n_actions: int,
+        n_obs: int,
         env: gym.Env,
         max_games: int = 10000,
+        games_to_decay_epsilon_for: int = 10000,
         lr: float = 1e-1,
-        epsilon_decay: float = 0.01,
-        alpha: float = 0.5,
+        alpha: float = 0.01,
+        gamma: float = 0.99,
         min_epsilon: float = 0.2,
         mini_batch_size=1,
         buffer_size=128,
+        state_type: str = "DISCRETE",
     ):
 
         super().__init__()
 
         self.network = network
         self.n_actions = n_actions
+        self.n_obs = n_obs
         self.opt = torch.optim.Adam(self.network.parameters(), lr=lr)
-        self.epsilon = 1
+        self.epsilon: float = 1
         self.max_games = max_games
-        self.epsilon_decay = min_epsilon ** (1 / max_games)
+        self.games_to_decay_epsilon_for = games_to_decay_epsilon_for
+        self.games_played = 0
+        self.epsilon_decay = min_epsilon ** (1 / games_to_decay_epsilon_for)
         self.min_epsilon = min_epsilon
         self.env = env
         self.alpha = alpha
-        self.gamma = 0.99
+        self.gamma = gamma
         self.reward_averages: list[list[float]] = []
+        self.evaluation_reward_averages: list[list[float]] = []
         self.action_counts = {i: 0 for i in range(self.n_actions)}
+        self.evaluation_action_counts = {i: 0 for i in range(self.n_actions)}
         self.mini_batch_size = mini_batch_size
         self.buffer_size = buffer_size
         self.transitions: deque[List[Any]] = deque([], maxlen=self.buffer_size)
+        self.evaluation_mode = False
+        self.state_is_discrete = state_type == "DISCRETE"
 
-    def update_epsilon(self, train):
-        pass
+    def update_epsilon(self):
+        if self.games_played < self.games_to_decay_epsilon_for:
+            self.epsilon *= self.epsilon_decay
 
-    def get_action(self, state: torch.Tensor, train: bool = False):
+    def get_action(self, state: torch.Tensor):
         """Sample actions with epsilon-greedy policy"""
+
         q_values = self.network(state)
 
         if len(q_values) == 1:
             return q_values
+
+        if self.evaluation_mode:
+            return int(torch.argmax(q_values))
 
         ran_num = torch.rand(1)
         if ran_num < self.epsilon:
@@ -72,28 +87,76 @@ class DQN(nn.Module):
 
     def _play_game(self) -> None:
         """Plays out one game"""
-        next_obs: np.ndarray = self.env.reset()  # type: ignore
+        next_obs_unformatted = np.array(self.env.reset())  # type: ignore
+        next_obs = self.format_obs(next_obs_unformatted)
         done = False
         rewards = []
         while not done:
             obs = next_obs
-            action = self.get_action(torch.tensor(obs))
-            next_obs, reward, done, _, _ = self.env.step(action)  # type: ignore
+            action = self.get_action(obs)
+            next_obs_unformatted, reward, done, termination, _ = self.env.step(action)  # type: ignore
+            next_obs = self.format_obs(np.array(next_obs_unformatted))
             rewards.append(reward)
             self.transitions.appendleft(
                 [obs.tolist(), [action], [reward], next_obs.tolist(), [done]]
             )
 
-        self.epsilon *= self.epsilon_decay
+            if termination:
+                done = True
+                reward *= 2
+
+        self.update_epsilon()
         self.reward_averages.append([0.0, sum(rewards)])
+        self.games_played += 1
 
-    def _play_games(self, games_to_play: int) -> None:
+    def _evaluate_game(self):
+        """
+        Evaluates the models performance for one game
+        """
+        next_obs_unformatted = np.array(self.env.reset())  # type: ignore
+        next_obs = self.format_obs(next_obs_unformatted)
+        done = False
+        rewards = []
+        actions = []
+        while not done:
+            obs = next_obs
+            action = self.get_action(obs)
+            next_obs_unformatted, reward, done, termination, _ = self.env.step(action)  # type: ignore
+            next_obs = self.format_obs(np.array(next_obs_unformatted))
+            rewards.append(reward)
+            actions.append(action)
 
-        while games_to_play > 1:
-            self._play_game()
-            if self.network_needs_updating():
-                self.update_network()
-            games_to_play -= 1
+            if termination:
+                done = True
+                reward *= 2
+
+        self.evaluation_reward_averages.append([0.0, sum(rewards)])
+        self.update_action_counts(Counter(actions))
+
+    def format_obs(self, obs: np.ndarray) -> torch.Tensor:
+        """format obs for optimal learning"""
+        if self.state_is_discrete:
+            encoded_state = np.zeros(self.n_obs, dtype=np.float32)
+            encoded_state[obs.item()] = 1
+            return torch.tensor(encoded_state, dtype=torch.float32)
+        else:
+            return torch.tensor(obs, dtype=torch.float32)
+
+    def play_games(self, max_games: int = 0) -> None:
+
+        games_to_play = self.max_games if max_games == 0 else max_games
+
+        if self.evaluation_mode:
+            while games_to_play > 1:
+                self._evaluate_game()
+                games_to_play -= 1
+
+        else:
+            while games_to_play > 1:
+                self._play_game()
+                if self.network_needs_updating():
+                    self.update_network()
+                games_to_play -= 1
 
     def network_needs_updating(self) -> bool:
         """For standard DQN, network needs updated if self.transitions contains more than
@@ -133,8 +196,12 @@ class DQN(nn.Module):
 
     def update_action_counts(self, new_action_counts):
 
-        for key, val in new_action_counts.items():
-            self.action_counts[key] += val
+        if self.evaluation_mode:
+            for key, val in new_action_counts.items():
+                self.evaluation_action_counts[key] += val
+        else:
+            for key, val in new_action_counts.items():
+                self.action_counts[key] += val
 
     def compute_loss(self, obs, actions, rewards, next_obs, done):
 
@@ -171,16 +238,23 @@ class DQN(nn.Module):
     @staticmethod
     def extract_transition_attributes_from_experiences(experiences):
 
-        arr_to_tensor = lambda arr: torch.tensor(list(arr))  # noqa: E731
+        obs = experiences[:, const.ATTRIBUTE_TO_INDEX["obs"]].tolist()
+        obs = torch.tensor(obs)
 
-        extract_att = lambda att: arr_to_tensor(  # noqa: E731
-            experiences[:, const.ATTRIBUTE_TO_INDEX[att]]
-        )
+        actions = experiences[:, const.ATTRIBUTE_TO_INDEX["actions"]].tolist()
+        actions = torch.tensor(actions)
 
-        obs = extract_att("obs")
-        actions = extract_att("actions")
-        rewards = extract_att("rewards")
-        next_obs = extract_att("next_obs")
-        done = extract_att("done")
+        rewards = experiences[:, const.ATTRIBUTE_TO_INDEX["rewards"]].tolist()
+        rewards = torch.tensor(rewards)
+
+        next_obs = experiences[:, const.ATTRIBUTE_TO_INDEX["next_obs"]].tolist()
+        next_obs = torch.tensor(next_obs)
+
+        done = experiences[:, const.ATTRIBUTE_TO_INDEX["done"]].tolist()
+        done = torch.tensor(done)
 
         return obs, actions, rewards, next_obs, done
+
+    # @staticmethod
+    # def numpy_array_to_torch_tensor
+    #     arr_to_tensor = lambda arr: torch.tensor(list(arr))  # noqa: E731

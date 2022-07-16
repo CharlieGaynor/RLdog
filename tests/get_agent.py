@@ -1,6 +1,6 @@
 from agents.DQN import DQN
-import gym
-from networks.base_network import StandardNN
+from networks.test_network import testNN
+from environments.easy import easy_env
 
 
 def grab_agent() -> DQN:
@@ -9,20 +9,16 @@ def grab_agent() -> DQN:
     """
 
     #  Use the new step API, which returns a truncated observation
-    env = gym.make("CartPole-v1", new_step_api=True)
+    env = easy_env()
 
-    try:
-        n_obs = env.reset().size  # type: ignore
-    except AttributeError:
-        pass
+    n_obs = env.n_obs
 
-    n_actions = (
-        env.action_space.n  # type: ignore
-    )  # Not sure how to programatically get this - some manual config will do
+    n_actions = env.n_actions
 
-    network1 = StandardNN(n_obs, n_actions)
+    network1 = testNN(n_obs, n_actions)
     # agent = eg_model(network1, env.action_space.n)
     buffer_size = 128
-    agent = DQN(network1, n_actions, env, buffer_size)
+    agent = DQN(network1, n_actions, n_obs, env, buffer_size)
+    agent.epsilon = 0.5
 
     return agent
