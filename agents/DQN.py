@@ -31,16 +31,16 @@ class DQN(nn.Module):
         self.n_actions = self.metadata["n_actions"]
         self.n_obs = self.metadata["n_obs"]
         if self.metadata.get("test", False):
-            self.network = testNN(self.n_obs, self.n_actions)
+            self.policy_network = testNN(self.n_obs, self.n_actions)
         else:
-            self.network = standardNN(self.n_obs, self.n_actions)  # type: ignore
+            self.policy_network = standardNN(self.n_obs, self.n_actions)  # type: ignore
 
         self.env = self.metadata["env"]
         self.state_type = self.metadata["state_type"]
 
         self.hyperparameters = config["hyperparameters"]
         self.opt = torch.optim.Adam(
-            self.network.parameters(), lr=self.hyperparameters["lr"]
+            self.policy_network.parameters(), lr=self.hyperparameters["lr"]
         )
         self.epsilon: float = 1
         self.max_games = self.hyperparameters["max_games"]
@@ -72,7 +72,8 @@ class DQN(nn.Module):
     def get_action(self, state: torch.Tensor):
         """Sample actions with epsilon-greedy policy"""
 
-        q_values = self.network(state)
+        with torch.no_grad():
+            q_values = self.policy_network(state)
 
         if len(q_values) == 1:
             return q_values
@@ -108,7 +109,6 @@ class DQN(nn.Module):
 
         self.update_epsilon()
         self.reward_averages.append([0.0, sum(rewards)])
-        self.games_played += 1
         self.steps_without_update += len(rewards)
 
     def _evaluate_game(self):
@@ -161,6 +161,7 @@ class DQN(nn.Module):
         else:
             while games_to_play > 1:
                 self._play_game()
+                self.games_played += 1
                 if self.network_needs_updating():
                     self.update_network()
                 games_to_play -= 1
@@ -193,7 +194,7 @@ class DQN(nn.Module):
             rewards,
             next_obs,
             done,
-        ) = self.extract_transition_attributes_from_experiences(experiences)
+        ) = self.attributes_from_experiences(experiences)
         loss = self.compute_loss(obs, actions, rewards, next_obs, done)
         self.opt.zero_grad()
         loss.backward()
@@ -216,22 +217,26 @@ class DQN(nn.Module):
 
     def compute_loss(self, obs, actions, rewards, next_obs, done):
 
+        
         current_q_vals = self.calculate_current_q_values(obs, actions)
-        target_q_vals = self.calculate_target_q_values(
-            current_q_vals, rewards, next_obs, done
-        )
+        with torch.no_grad():
+            target_q_vals = self.calculate_target_q_values(
+                current_q_vals, rewards, next_obs, done
+            )
 
         loss = torch.mean((target_q_vals - current_q_vals) ** 2)
         return loss
 
     def calculate_current_q_values(self, obs, actions):
-        q_values = self.network(obs)
+        """Computes the current q values for the actions we took"""
+        q_values = self.policy_network(obs)
         actioned_q_values = self.calculate_actioned_q_values(q_values, actions)
         return actioned_q_values
 
     def calculate_target_q_values(self, current_q_vals, rewards, next_obs, done):
+        """Computes the target q values for the actions we took"""
 
-        next_q_vals = self.network(next_obs)
+        next_q_vals = self.policy_network(next_obs).detach()
         target_q_vals_max = torch.max(next_q_vals, dim=-1).values
 
         # What should the Q values be updated to for the actions we took?
@@ -247,7 +252,7 @@ class DQN(nn.Module):
         return q_vals[range(q_vals.shape[0]), actions.flatten()]
 
     @staticmethod
-    def extract_transition_attributes_from_experiences(experiences):
+    def attributes_from_experiences(experiences):
 
         obs = experiences[:, const.ATTRIBUTE_TO_INDEX["obs"]].tolist()
         obs = torch.tensor(obs)
@@ -266,6 +271,3 @@ class DQN(nn.Module):
 
         return obs, actions, rewards, next_obs, done
 
-    # @staticmethod
-    # def numpy_array_to_torch_tensor
-    #     arr_to_tensor = lambda arr: torch.tensor(list(arr))  # noqa: E731

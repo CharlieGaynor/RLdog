@@ -7,11 +7,13 @@ config = {
             "max_games": 10000,
             "min_epsilon": 0.1,
             "lr": 1e-2,
-            "alpha": 0.1,
+            "alpha": 0.9,
             "gamma": 0.99,
             "mini_batch_size": 12,
             "buffer_size": 120,
             "games_to_decay_epsilon_for": 10000 // 2,
+            'tau': 1,
+            'games_before_updating_target_network': 10
         },
         "metadata": {
             "n_actions": 2,

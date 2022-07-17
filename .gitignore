@@ -3,3 +3,6 @@ local_test.ipynb
 __pycache__
 
 .tox
+old_agents/
+.mypy_cache
+.pytest_cache
