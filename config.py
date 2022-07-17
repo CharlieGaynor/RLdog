@@ -1,4 +1,5 @@
 import gym
+from environments.easy import easy_env
 
 config = {
     "BLACKJACK": {
@@ -10,7 +11,7 @@ config = {
             "gamma": 0.99,
             "mini_batch_size": 12,
             "buffer_size": 120,
-            "games_to_decay_epsilon_for": 10000 // 2
+            "games_to_decay_epsilon_for": 10000 // 2,
         },
         "metadata": {
             "n_actions": 2,
@@ -18,5 +19,24 @@ config = {
             "env": gym.make("Blackjack-v1", new_step_api=True),
             "state_type": "TUPLE",
         },
-    }
+    },
+    "TEST": {
+        "hyperparameters": {
+            "max_games": 1000,
+            "min_epsilon": 0.1,
+            "lr": 1e-3,
+            "alpha": 0.1,
+            "gamma": 0.99,
+            "mini_batch_size": 10,
+            "buffer_size": 20,
+            "games_to_decay_epsilon_for": 750,
+        },
+        "metadata": {
+            "n_actions": 5,
+            "n_obs": 5,
+            "env": easy_env(),
+            "state_type": "DISCRETE",
+            "test": True,
+        }
+    },
 }

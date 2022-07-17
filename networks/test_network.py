@@ -12,7 +12,6 @@ class testNN(baseNN):
         super(testNN, self).__init__()
 
         self.l1 = nn.Linear(n_obs, n_actions)
-        self.l1.weight.data = torch.tensor([[0], [1], [0], [0], [0]], dtype=torch.float32)
         self.l1.bias.data.fill_(0)
 
     def forward(self, state):

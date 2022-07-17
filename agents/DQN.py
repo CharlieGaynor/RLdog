@@ -3,11 +3,10 @@ import torch
 from torch import nn
 import numpy as np
 from collections import deque
-import gym
 import constants as const
 from collections import Counter
-from networks import base_network
 from networks.standard_network import standardNN
+from networks.test_network import testNN
 from supporting_functions.plotters import plot_results
 
 # at the minute using epislon greedy - could generalise this out into a seperate class
@@ -24,14 +23,18 @@ class DQN(nn.Module):
         epsilon_decay (float, optional): Multiplication factor for epsilon
     """
 
-    def __init__(self, config: Dict["str", Dict["str", Any]]):
+    def __init__(self, config: Dict["str", Any]):
 
         super().__init__()
 
         self.metadata = config["metadata"]
         self.n_actions = self.metadata["n_actions"]
         self.n_obs = self.metadata["n_obs"]
-        self.network = standardNN(self.n_obs, self.n_actions)
+        if self.metadata.get("test", False):
+            self.network = testNN(self.n_obs, self.n_actions)
+        else:
+            self.network = standardNN(self.n_obs, self.n_actions)  # type: ignore
+
         self.env = self.metadata["env"]
         self.state_type = self.metadata["state_type"]
 
@@ -85,14 +88,14 @@ class DQN(nn.Module):
 
     def _play_game(self) -> None:
         """Plays out one game"""
-        next_obs_unformatted = np.array(self.env.reset())  # type: ignore
+        next_obs_unformatted = np.array(self.env.reset())
         next_obs = self.format_obs(next_obs_unformatted)
         done = False
         rewards = []
         while not done:
             obs = next_obs
             action = self.get_action(obs)
-            next_obs_unformatted, reward, done, termination, _ = self.env.step(action)  # type: ignore
+            next_obs_unformatted, reward, done, termination, _ = self.env.step(action)
             next_obs = self.format_obs(np.array(next_obs_unformatted))
             rewards.append(reward)
             self.transitions.appendleft(
@@ -112,7 +115,7 @@ class DQN(nn.Module):
         """
         Evaluates the models performance for one game
         """
-        next_obs_unformatted = np.array(self.env.reset())  # type: ignore
+        next_obs_unformatted = np.array(self.env.reset())
         next_obs = self.format_obs(next_obs_unformatted)
         done = False
         rewards = []
@@ -120,7 +123,7 @@ class DQN(nn.Module):
         while not done:
             obs = next_obs
             action = self.get_action(obs)
-            next_obs_unformatted, reward, done, termination, _ = self.env.step(action)  # type: ignore
+            next_obs_unformatted, reward, done, termination, _ = self.env.step(action)
             next_obs = self.format_obs(np.array(next_obs_unformatted))
             rewards.append(reward)
             actions.append(action)
@@ -152,9 +155,9 @@ class DQN(nn.Module):
             if verbose:
                 total_rewards = [i[-1] for i in self.evaluation_reward_averages]
                 plot_results(total_rewards)
-                print('Action counts', self.evaluation_action_counts)
-                print('Mean reward', sum(total_rewards) / len(total_rewards))
-                
+                print("Action counts", self.evaluation_action_counts)
+                print("Mean reward", sum(total_rewards) / len(total_rewards))
+
         else:
             while games_to_play > 1:
                 self._play_game()
@@ -164,8 +167,6 @@ class DQN(nn.Module):
             if verbose:
                 total_rewards = [i[-1] for i in self.reward_averages]
                 plot_results(total_rewards)
-                
-        
 
     def network_needs_updating(self) -> bool:
         """For standard DQN, network needs updated if self.transitions contains more than
@@ -203,7 +204,6 @@ class DQN(nn.Module):
         if self.network_needs_updating():
             self.steps_without_update -= self.mini_batch_size
             self.update_network()
-            
 
     def update_action_counts(self, new_action_counts):
 

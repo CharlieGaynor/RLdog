@@ -1,12 +1,13 @@
+from cmath import exp
 import random
 from collections import Counter
 import numpy as np
 import config
-from agents.DQN import DQN
+from agents.DQN_RS import DQN_RS
 
 test_config = config.config["TEST"]
 
-agent = DQN(test_config)
+agent = DQN_RS(test_config)
 agent.epsilon = 0.5
 
 
@@ -15,14 +16,13 @@ def test_transition_sampling():
     Checks FI-FO works & buffer size is met
     """
     buffer_size = agent.buffer_size
+    mini_batch_size = agent.mini_batch_size
     for i in range(buffer_size):
         agent.transitions.appendleft(i)
-    assert agent.transitions.pop() == 0
-    agent.transitions.append(0)
-    assert agent.transitions[-1] == 0
-
-    agent.transitions.append(0)
-    assert len(agent.transitions) == buffer_size
+    experience_sample: np.ndarray = agent.sample_experiences()
+    
+    assert len(experience_sample) == mini_batch_size  # Correct number of samples?
+    assert len(agent.transitions) == buffer_size  # Did we remove any samples (shouldn't)
 
 
 def test_get_action():
@@ -45,4 +45,4 @@ def test_get_action():
         actions.append(agent.get_action(agent.format_obs(np.array(num))))
 
     assert max(dict(Counter(actions)).values()) < 50
-    agent.epsilon = 0.5
+    agent.epsilon = 0.5 

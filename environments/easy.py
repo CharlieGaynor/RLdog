@@ -1,6 +1,5 @@
 import random
 import gym
-import numpy as np
 
 
 class easy_env(gym.Env):
@@ -21,19 +20,14 @@ class easy_env(gym.Env):
         num = random.randint(0, 4)
         self.current_number = num
         self.steps_taken = 0
-        obs = np.zeros(5, dtype=np.float32)
-        obs[num] = 1
-        return obs
+        return num
 
     def step(self, num):
         self.steps_taken += 1
         done = 1 if self.steps_taken == 4 else 0
         reward = 1.0 if num == self.current_number else 0.0
         
-        obs = np.zeros(5, dtype=np.float32)
         num = random.randint(0, 4)
         self.current_number = num
-        if not done:
-            obs[num] = 1
 
-        return obs, reward, done, 'hi', 'hi'
+        return num, reward, done, 'hi', 'hi'

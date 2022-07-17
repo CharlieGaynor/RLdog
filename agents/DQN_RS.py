@@ -1,21 +1,13 @@
 from agents.DQN import DQN
 import random
-from typing import List, Any
-import torch
-from torch import nn
 import numpy as np
-from collections import deque
-import gym
-import constants as const
-from collections import Counter
-from networks import base_network
 
 
 class DQN_RS(DQN):
     """
     DQN but with random sampling instead
     """
-    
+
     def __init__(self, config):
         DQN.__init__(self, config)
 
