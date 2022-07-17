@@ -25,3 +25,7 @@ class DQN_PR(DQN):
         return np.array(
             random.sample(self.transitions, k=self.mini_batch_size), dtype=object
         )
+
+
+    def save_data(self):
+        pass

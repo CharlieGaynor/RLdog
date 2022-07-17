@@ -98,9 +98,7 @@ class DQN(nn.Module):
             next_obs_unformatted, reward, done, termination, _ = self.env.step(action)
             next_obs = self.format_obs(np.array(next_obs_unformatted))
             rewards.append(reward)
-            self.transitions.appendleft(
-                [obs.tolist(), [action], [reward], next_obs.tolist(), [done]]
-            )
+            self.save_data(obs, action, reward, next_obs, done)
 
             if termination:
                 done = True
@@ -242,6 +240,12 @@ class DQN(nn.Module):
         )
         return target_q_vals
 
+    def save_data(self, obs, action, reward, next_obs, done):
+            self.transitions.appendleft(
+                [obs.tolist(), [action], [reward], next_obs.tolist(), [done]]
+            )
+        
+        
     @staticmethod
     def calculate_actioned_q_values(q_vals, actions):
         return q_vals[range(q_vals.shape[0]), actions.flatten()]
