@@ -7,7 +7,7 @@ import constants as const
 from collections import Counter
 from networks.standard_network import standardNN
 from networks.test_network import testNN
-from supporting_functions.plotters import plot_results
+from tools.plotters import plot_results
 
 # at the minute using epislon greedy - could generalise this out into a seperate class
 # priority is having mini batches
