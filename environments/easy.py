@@ -26,8 +26,8 @@ class easy_env(gym.Env):
         self.steps_taken += 1
         done = 1 if self.steps_taken == 4 else 0
         reward = 1.0 if num == self.current_number else 0.0
-        
+
         num = random.randint(0, 4)
         self.current_number = num
 
-        return num, reward, done, 'hi', 'hi'
+        return num, reward, done, "hi", "hi"

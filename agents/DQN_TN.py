@@ -1,8 +1,5 @@
 from agents.DQN import DQN
-import random
-import numpy as np
 from networks.standard_network import standardNN
-from networks.test_network import testNN
 from collections import Counter
 import torch
 
@@ -14,15 +11,16 @@ class DQN_TN(DQN):
 
     def __init__(self, config):
         DQN.__init__(self, config)
-        self.policy_network = testNN(self.n_obs, self.n_actions)
-        self.target_network = testNN(self.n_obs, self.n_actions)
+        self.policy_network = standardNN(self.n_obs, self.n_actions)
+        self.target_network = standardNN(self.n_obs, self.n_actions)
         self.target_network.eval()
 
         self.opt = torch.optim.Adam(
             self.policy_network.parameters(), lr=self.hyperparameters["lr"]
         )
-        self.copy_model_over(
-            from_model=self.policy_network, to_model=self.target_network
+        # Start off with the same networks
+        self.copy_network_over(
+            from_network=self.policy_network, to_network=self.target_network
         )
         self.consecutive_updates = 0
 
@@ -50,18 +48,20 @@ class DQN_TN(DQN):
 
         self.update_action_counts(Counter(actions.flatten().tolist()))
 
-        self.copy_model_over(
-            from_model=self.policy_network, to_model=self.target_network
-        )
-        # self.soft_update_of_target_network()
+        # self.copy_network_over(
+        #     from_model=self.policy_network, to_model=self.target_network
+        # )
+        self.soft_update_of_target_network()
 
         if self.network_needs_updating():
             self.steps_without_update -= self.mini_batch_size
             self.update_network()
 
     def soft_update_of_target_network(self):
-        """Updates the target network in the direction of the local network but by taking a small step size instead
-        The target network's parameter values trail the local networks. This helps stabilise training apparently"""
+        """Updates the target network in the direction of the local network,
+        but by taking a small step size instead
+        The target network's parameter values will trail the local networks.
+        This helps stabilise training apparently"""
 
         for to_network, from_network in zip(
             self.target_network.parameters(), self.policy_network.parameters()
@@ -86,6 +86,6 @@ class DQN_TN(DQN):
         return target_q_vals
 
     @staticmethod
-    def copy_model_over(to_model, from_model):
+    def copy_network_over(to_network, from_network):
         """Copies model parameters from from_model to to_model"""
-        to_model.load_state_dict(from_model.state_dict())
+        to_network.load_state_dict(from_network.state_dict())

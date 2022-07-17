@@ -1,6 +1,5 @@
 import torch.nn as nn
 from networks.base_network import baseNN
-import torch
 
 
 class testNN(baseNN):

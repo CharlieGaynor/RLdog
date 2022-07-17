@@ -12,8 +12,8 @@ config = {
             "mini_batch_size": 12,
             "buffer_size": 120,
             "games_to_decay_epsilon_for": 10000 // 2,
-            'tau': 1,
-            'games_before_updating_target_network': 10
+            "tau": 0.01,
+            "games_before_updating_target_network": 10,
         },
         "metadata": {
             "n_actions": 2,
@@ -32,6 +32,8 @@ config = {
             "mini_batch_size": 10,
             "buffer_size": 20,
             "games_to_decay_epsilon_for": 750,
+            "tau": 0.5,
+            "games_before_updating_target_network": 10,
         },
         "metadata": {
             "n_actions": 5,
@@ -39,6 +41,6 @@ config = {
             "env": easy_env(),
             "state_type": "DISCRETE",
             "test": True,
-        }
+        },
     },
 }

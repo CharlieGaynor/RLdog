@@ -1,5 +1,4 @@
 from agents.DQN_TN import DQN_TN
-import torch
 
 
 class DDQN(DQN_TN):

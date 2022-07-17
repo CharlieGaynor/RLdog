@@ -1,4 +1,3 @@
-from cmath import exp
 import random
 from collections import Counter
 import numpy as np
@@ -20,7 +19,7 @@ def test_transition_sampling():
     for i in range(buffer_size):
         agent.transitions.appendleft(i)
     experience_sample: np.ndarray = agent.sample_experiences()
-    
+
     assert len(experience_sample) == mini_batch_size  # Correct number of samples?
     assert len(agent.transitions) == buffer_size  # Did we remove any samples (shouldn't)
 
@@ -45,4 +44,4 @@ def test_get_action():
         actions.append(agent.get_action(agent.format_obs(np.array(num))))
 
     assert max(dict(Counter(actions)).values()) < 50
-    agent.epsilon = 0.5 
+    agent.epsilon = 0.5

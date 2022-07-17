@@ -217,7 +217,6 @@ class DQN(nn.Module):
 
     def compute_loss(self, obs, actions, rewards, next_obs, done):
 
-        
         current_q_vals = self.calculate_current_q_values(obs, actions)
         with torch.no_grad():
             target_q_vals = self.calculate_target_q_values(
@@ -270,4 +269,3 @@ class DQN(nn.Module):
         done = torch.tensor(done)
 
         return obs, actions, rewards, next_obs, done
-
