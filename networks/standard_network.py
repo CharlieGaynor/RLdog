@@ -11,11 +11,11 @@ class standardNN(baseNN):
         super(standardNN, self).__init__()
 
         self.l1 = nn.Linear(n_obs, n_obs * 5)
-        # self.l2 = nn.Linear(n_obs * 10, n_obs * 5)
+        self.l2 = nn.Linear(n_obs * 10, n_obs * 5)
         self.l3 = nn.Linear(n_obs * 5, n_actions)
         self.activation = nn.ReLU()
 
     def forward(self, state):
         output = self.activation(self.l1(state))
-        # output = self.activation(self.l2(pass1))
+        output = self.activation(self.l2(output))
         return self.l3(output)
