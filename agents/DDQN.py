@@ -1,22 +1,35 @@
 from agents.DQN_TN import DQN_TN
+import torch
 
 
 class DDQN(DQN_TN):
-    """A double DQN agent"""
+    """A double DQN agent
 
-    agent_name = "DDQN"
+    Now we use the policy network to find which action corresponds
+    to the largest Q value for the 'next state'
+
+    Then use the target network to get the Q value instead."""
 
     def __init__(self, config):
         DQN_TN.__init__(self, config)
 
-    def calculate_target_q_values(self, current_q_vals, rewards, next_obs, done):
-
+    def calculate_target_q_values(
+        self,
+        current_q_vals: torch.Tensor,
+        rewards: torch.FloatTensor,
+        next_obs: torch.Tensor,
+        done: torch.BoolTensor,
+    ) -> torch.FloatTensor:
+        """
+        Use the policy network to find which action corresponds
+        to the largest Q value for the 'next state'
+        """
         max_qvalue_actions = self.policy_network(next_obs).detach().argmax(1)
         target_q_vals_max = self.calculate_actioned_q_values(
             self.target_network(next_obs), max_qvalue_actions
         )
 
-        # What should the Q values be updated to for the actions we took?
+        # What the Q values should be updated to for the actions we took
         target_q_vals = (
             current_q_vals * (1 - self.alpha)
             + self.alpha * rewards.flatten()

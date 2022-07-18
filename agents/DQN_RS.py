@@ -5,7 +5,8 @@ import numpy as np
 
 class DQN_RS(DQN):
     """
-    DQN but with random sampling instead
+    DQN but with random sampling instead. Use the same buffer,
+    but sample randomly & don't delete experiences after you've sampled
     """
 
     def __init__(self, config):

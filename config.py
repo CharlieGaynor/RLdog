@@ -38,7 +38,7 @@ config = {
         "metadata": {
             "n_actions": 5,
             "n_obs": 5,
-            "env": easy_env(),
+            "env": easy_env(),  # type: ignore
             "state_type": "DISCRETE",
             "test": True,
         },

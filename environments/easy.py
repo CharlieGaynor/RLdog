@@ -30,4 +30,4 @@ class easy_env(gym.Env):
         num = random.randint(0, 4)
         self.current_number = num
 
-        return num, reward, done, "hi", "hi"
+        return num, reward, done, False, ""
