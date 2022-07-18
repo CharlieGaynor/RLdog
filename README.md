@@ -1,4 +1,4 @@
-# RLdog
+# PyRL
 Environment Agnostic RL algorithm implementations using Pytorch.
 
 Code is type-hinted & uses minibatches - a common downfall to public libraries
