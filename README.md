@@ -1,6 +1,8 @@
 # PyRL
 Environment Agnostic RL algorithm implementations using Pytorch.
 
+-- Work in progress, not too much done yet :) --
+
 Code is type-hinted & uses minibatches - a common downfall to public libraries
 
 Currently 4 DQN-style algorithims implemented - see exmples.ipynb for one particular environment tested
