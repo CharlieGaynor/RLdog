@@ -1,4 +1,4 @@
-from agents.DQN_TN import DQN_TN
+from agents.DQN_based.DQN_TN import DQN_TN
 import torch
 
 

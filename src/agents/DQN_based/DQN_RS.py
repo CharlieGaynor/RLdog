@@ -1,4 +1,4 @@
-from agents.DQN import DQN
+from agents.DQN_based.DQN import DQN
 import random
 import numpy as np
 

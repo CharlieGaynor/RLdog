@@ -1,8 +1,8 @@
 import random
 from collections import Counter
 import numpy as np
-import config
-from agents.DQN import DQN
+import config as config
+from agents.DQN_based.DQN import DQN
 
 test_config = config.config["TEST"]
 

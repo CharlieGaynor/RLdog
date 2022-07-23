@@ -1,5 +1,5 @@
-import config
-from agents.DQN_TN import DQN_TN
+import config as config
+from agents.DQN_based.DQN_TN import DQN_TN
 
 test_config = config.config["TEST"]
 

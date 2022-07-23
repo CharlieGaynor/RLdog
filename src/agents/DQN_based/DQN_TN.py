@@ -1,5 +1,5 @@
 from typing import Any, Dict
-from agents.DQN import DQN
+from agents.DQN_based.DQN import DQN
 from networks.base_network import baseNN
 from networks.standard_network import standardNN
 from collections import Counter
