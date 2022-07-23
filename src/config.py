@@ -31,10 +31,24 @@ config = {
             },
             "metadata": {
                 "n_actions": 2,
-                "n_obs": 32+11+2,
+                "n_obs": 32 + 11 + 2,
                 "env": gym.make("Blackjack-v1", new_step_api=True),
                 "state_type": "TUPLE",
-                "one_hot_encoding_basepoints": [0, 32, 32+11]
+                "one_hot_encoding_basepoints": [0, 32, 32 + 11],
+            },
+        },
+        "AC": {
+            "hyperparameters": {
+                "max_games": 10000,
+                "lr": 1e-2,
+                "gamma": 0.95,
+            },
+            "metadata": {
+                "n_actions": 2,
+                "n_obs": 3,
+                "env": gym.make("Blackjack-v1", new_step_api=True),
+                "state_type": "TUPLE",
+                "one_hot_encoding_basepoints": []
             },
         },
     },

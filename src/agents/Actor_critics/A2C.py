@@ -6,6 +6,7 @@ from collections import deque
 import constants as const
 from collections import Counter
 from networks.REINFORCE_network import reinforceNN
+from networks.DQN_network import dqnNN
 from networks.test_network import testNN
 from tools.plotters import plot_results
 
@@ -13,10 +14,11 @@ from tools.plotters import plot_results
 # priority is having mini batches
 
 
-class REINFORCE(nn.Module):
+class A2C(nn.Module):
     """
-    blah blah blah
+    Advantage Actor Critic. This is just one worker for now, but it's not too hard to add more (this is one of the next steps)
 
+    At the minute, The actor & critic don't share networks. The literature is unclear on which is better.
     """
 
     def __init__(self, config: Dict[str, Any]):
@@ -26,19 +28,20 @@ class REINFORCE(nn.Module):
         self.metadata = config["metadata"]
         self.n_actions = self.metadata["n_actions"]
         self.n_obs = self.metadata["n_obs"]
-        self.policy_network = reinforceNN(self.n_obs, self.n_actions)  # type: ignore
+        self.actor = reinforceNN(self.n_obs, self.n_actions)  # type: ignore
+        self.critic = dqnNN(self.n_obs, 1)
         self.env = self.metadata["env"]
         self.state_type = self.metadata["state_type"]
         self.one_hot_encoding_basepoints = self.metadata.get("one_hot_encoding_basepoints", [])
 
         self.hyperparameters = config["hyperparameters"]
-        self.opt = torch.optim.Adam(self.policy_network.parameters(), lr=self.hyperparameters["lr"])
+        self.actor_opt = torch.optim.Adam(self.actor.parameters(), lr=self.hyperparameters["lr"])
+        self.critic_opt = torch.optim.Adam(self.critic.parameters(), lr=self.hyperparameters["lr"])
         self.max_games: int = self.hyperparameters["max_games"]
         self.action_counts = {i: 0 for i in range(self.n_actions)}
         self.evaluation_action_counts = {i: 0 for i in range(self.n_actions)}
         self.state_is_discrete: bool = self.state_type == "DISCRETE"
         self.gamma = self.hyperparameters["gamma"]
-
 
         self.transitions: list[tuple[torch.FloatTensor, int, float]] = []
         self.reward_averages: list[list[float]] = []
@@ -56,6 +59,7 @@ class REINFORCE(nn.Module):
         while not done:
             obs = next_obs
             action = self.get_action(obs)
+            critic_value = self.get_value(obs)
             next_obs_unformatted, reward, done, termination, _ = self.env.step(action)
             next_obs = self.format_obs(np.array(next_obs_unformatted))
             rewards.append(reward)
@@ -63,22 +67,21 @@ class REINFORCE(nn.Module):
             if termination:
                 done = True
 
-            self.transitions.append((obs, action, reward))
+            self.transitions.append((obs, action, reward, critic_value))
 
 
-        
         if self.evaluation_mode:
             self.evaluation_reward_averages.append([0.0, sum(rewards)])
         else:
             self.reward_averages.append([0.0, sum(rewards)])
             self.update_network()
-            
+
     def get_action(self, state: torch.Tensor) -> int:
         """Sample actions with softmax probabilities. If evaluating, set a min probability"""
 
         with torch.no_grad():
-            probabilities = self.policy_network(state)
-        
+            probabilities = self.actor(state)
+
         if np.random.random() < 0.001:
             print(probabilities)
 
@@ -91,53 +94,70 @@ class REINFORCE(nn.Module):
         action = np.random.choice(len(numpy_probabilities), p=numpy_probabilities)
         return action
 
+    def get_value(self, state: torch.Tensor) -> torch.FloatTensor:
+        return self.critic(state)
+
     def update_network(self):
         """Sample experiences, compute & back propagate loss"""
 
-        obs = torch.tensor(np.array([s.numpy() for (s, a, r) in self.transitions]), dtype=torch.float32)
-        actions = torch.tensor(np.array([a for (s, a, r) in self.transitions]), dtype=torch.long)
-        rewards = torch.tensor(np.array([r for (s, a, r) in self.transitions]), dtype=torch.float32)
+        obs = torch.tensor(np.array([s.numpy() for (s, a, r, c) in self.transitions]), dtype=torch.float32)
+        actions = torch.tensor(np.array([a for (s, a, r, c) in self.transitions]), dtype=torch.long)
+        rewards = torch.tensor(np.array([r for (s, a, r, c) in self.transitions]), dtype=torch.float32)
+        critic_values = torch.tensor([c for (s, a, r, c) in self.transitions], dtype=torch.float32, requires_grad=True)
 
-        loss = self.compute_loss(obs, actions, rewards)
-        self.opt.zero_grad()
-        loss.backward()
-        self.opt.step()
+        discounted_rewards = self.compute_discounted_rewards(rewards)
+
+        # First compute actor loss and update network
+        actor_loss = self.compute_actor_loss(obs, actions, discounted_rewards, critic_values)
+        self.actor_opt.zero_grad()
+        actor_loss.backward()
+        self.actor_opt.step()
+
+        critic_loss = self.compute_critic_loss(discounted_rewards, critic_values)
+        self.critic_opt.zero_grad()
+        critic_loss.backward()
+        self.critic_opt.step()
 
         self.transitions = []
 
-    def compute_loss(
+    def compute_actor_loss(
         self,
         obs: torch.Tensor,
         actions: torch.LongTensor,
-        rewards: torch.FloatTensor,
+        discounted_rewards: torch.FloatTensor,
+        critic_values: torch.FloatTensor,
     ) -> torch.Tensor:
         """Compute loss according to REINFORCE"""
 
-        probabilities = self.policy_network(obs)
+        probabilities = self.actor(obs)
         actioned_probabilities = probabilities.gather(dim=-1, index=actions.view(-1, 1)).squeeze()
 
-        decayed_rewards = self.compute_decayed_rewards(rewards)
-
-        loss = torch.sum(torch.log(actioned_probabilities) * decayed_rewards)
+        loss = - torch.mean(torch.log(actioned_probabilities) * (discounted_rewards - critic_values), dim=-1)
         return loss
 
-    def compute_decayed_rewards(self, rewards: torch.FloatTensor) -> torch.FloatTensor:
+    def compute_critic_loss(
+        self, discounted_rewards: torch.FloatTensor, critic_values: torch.FloatTensor
+    ) -> torch.Tensor:
 
-        decayed_rewards = []
+        return 0.5 * torch.mean((discounted_rewards - critic_values) ** 2, dim=-1)
+
+    def compute_discounted_rewards(self, rewards: torch.FloatTensor) -> torch.FloatTensor:
+
+        discounted_rewards = []
 
         for i in range(len(rewards)):
             total = 0
             for j in range(i, len(rewards)):
-                total += rewards[j] * self.gamma ** (j - 1)
+                total += rewards[j] * self.gamma ** (j)
 
-            decayed_rewards.append(total)
+            discounted_rewards.append(total)
 
-        max_reward = max(decayed_rewards)
+        max_reward = max(discounted_rewards)
 
         return (
-            torch.FloatTensor(decayed_rewards) / max_reward
+            torch.FloatTensor(discounted_rewards) / max_reward
             if max_reward != torch.tensor(0.0)
-            else torch.FloatTensor(decayed_rewards)
+            else torch.FloatTensor(discounted_rewards)
         )
 
     def play_games(self, games_to_play: int = 0, verbose: bool = False) -> None:
@@ -153,7 +173,7 @@ class REINFORCE(nn.Module):
 
         if verbose:
             if self.evaluation_mode:
-                actions = Counter([a for (s, a, r) in self.transitions])
+                actions = Counter([a for (s, a, r, c) in self.transitions])
                 self.update_action_counts(actions)
                 total_rewards = [i[-1] for i in self.evaluation_reward_averages]
                 plot_results(total_rewards)

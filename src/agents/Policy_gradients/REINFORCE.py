@@ -39,7 +39,6 @@ class REINFORCE(nn.Module):
         self.state_is_discrete: bool = self.state_type == "DISCRETE"
         self.gamma = self.hyperparameters["gamma"]
 
-
         self.transitions: list[tuple[torch.FloatTensor, int, float]] = []
         self.reward_averages: list[list[float]] = []
         self.evaluation_reward_averages: list[list[float]] = []
@@ -65,22 +64,17 @@ class REINFORCE(nn.Module):
 
             self.transitions.append((obs, action, reward))
 
-
-        
         if self.evaluation_mode:
             self.evaluation_reward_averages.append([0.0, sum(rewards)])
         else:
             self.reward_averages.append([0.0, sum(rewards)])
             self.update_network()
-            
+
     def get_action(self, state: torch.Tensor) -> int:
         """Sample actions with softmax probabilities. If evaluating, set a min probability"""
 
         with torch.no_grad():
             probabilities = self.policy_network(state)
-        
-        if np.random.random() < 0.001:
-            print(probabilities)
 
         numpy_probabilities: np.array = probabilities.data.flatten().numpy()
 
@@ -116,28 +110,28 @@ class REINFORCE(nn.Module):
         probabilities = self.policy_network(obs)
         actioned_probabilities = probabilities.gather(dim=-1, index=actions.view(-1, 1)).squeeze()
 
-        decayed_rewards = self.compute_decayed_rewards(rewards)
+        discounted_rewards = self.compute_discounted_rewards(rewards)
 
-        loss = torch.sum(torch.log(actioned_probabilities) * decayed_rewards)
+        loss = torch.sum(torch.log(actioned_probabilities) * discounted_rewards)
         return loss
 
-    def compute_decayed_rewards(self, rewards: torch.FloatTensor) -> torch.FloatTensor:
+    def compute_discounted_rewards(self, rewards: torch.FloatTensor) -> torch.FloatTensor:
 
-        decayed_rewards = []
+        discounted_rewards = []
 
         for i in range(len(rewards)):
             total = 0
             for j in range(i, len(rewards)):
                 total += rewards[j] * self.gamma ** (j - 1)
 
-            decayed_rewards.append(total)
+            discounted_rewards.append(total)
 
-        max_reward = max(decayed_rewards)
+        max_reward = max(discounted_rewards)
 
         return (
-            torch.FloatTensor(decayed_rewards) / max_reward
+            torch.FloatTensor(discounted_rewards) / max_reward
             if max_reward != torch.tensor(0.0)
-            else torch.FloatTensor(decayed_rewards)
+            else torch.FloatTensor(discounted_rewards)
         )
 
     def play_games(self, games_to_play: int = 0, verbose: bool = False) -> None:
