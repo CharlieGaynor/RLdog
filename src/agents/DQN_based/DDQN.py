@@ -25,9 +25,7 @@ class DDQN(DQN_TN):
         to the largest Q value for the 'next state'
         """
         max_qvalue_actions = self.policy_network(next_obs).detach().argmax(1)
-        target_q_vals_max = self.calculate_actioned_q_values(
-            self.target_network(next_obs), max_qvalue_actions
-        )
+        target_q_vals_max = self.calculate_actioned_q_values(self.target_network(next_obs), max_qvalue_actions)
 
         # What the Q values should be updated to for the actions we took
         target_q_vals = (

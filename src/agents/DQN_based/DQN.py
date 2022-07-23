@@ -5,7 +5,7 @@ import numpy as np
 from collections import deque
 import constants as const
 from collections import Counter
-from networks.standard_network import standardNN
+from networks.DQN_network import dqnNN
 from networks.test_network import testNN
 from tools.plotters import plot_results
 
@@ -33,28 +33,22 @@ class DQN(nn.Module):
         if self.metadata.get("test", False):
             self.policy_network = testNN(self.n_obs, self.n_actions)
         else:
-            self.policy_network = standardNN(self.n_obs, self.n_actions)  # type: ignore
+            self.policy_network = dqnNN(self.n_obs, self.n_actions)  # type: ignore
         self.env = self.metadata["env"]
         self.state_type = self.metadata["state_type"]
 
         self.hyperparameters = config["hyperparameters"]
-        self.opt = torch.optim.Adam(
-            self.policy_network.parameters(), lr=self.hyperparameters["lr"]
-        )
+        self.opt = torch.optim.Adam(self.policy_network.parameters(), lr=self.hyperparameters["lr"])
         self.epsilon = 1.0
         self.max_games: int = self.hyperparameters["max_games"]
-        self.games_to_decay_epsilon_for: int = self.hyperparameters[
-            "games_to_decay_epsilon_for"
-        ]
+        self.games_to_decay_epsilon_for: int = self.hyperparameters["games_to_decay_epsilon_for"]
         self.min_epsilon: float = self.hyperparameters["min_epsilon"]
         self.alpha: float = self.hyperparameters["alpha"]
         self.gamma: float = self.hyperparameters["gamma"]
         self.mini_batch_size: int = self.hyperparameters["mini_batch_size"]
         self.buffer_size: int = self.hyperparameters["buffer_size"]
 
-        self.epsilon_decay: float = self.min_epsilon ** (
-            1 / self.games_to_decay_epsilon_for
-        )
+        self.epsilon_decay: float = self.min_epsilon ** (1 / self.games_to_decay_epsilon_for)
         self.action_counts = {i: 0 for i in range(self.n_actions)}
         self.evaluation_action_counts = {i: 0 for i in range(self.n_actions)}
         self.state_is_discrete: bool = self.state_type == "DISCRETE"
@@ -82,9 +76,7 @@ class DQN(nn.Module):
             next_obs_unformatted, reward, done, termination, _ = self.env.step(action)
             next_obs = self.format_obs(np.array(next_obs_unformatted))
             rewards.append(reward)
-            self.transitions.appendleft(
-                [obs.tolist(), [action], [reward], next_obs.tolist(), [done]]
-            )
+            self.transitions.appendleft([obs.tolist(), [action], [reward], next_obs.tolist(), [done]])
 
             if termination:
                 done = True
@@ -184,16 +176,12 @@ class DQN(nn.Module):
 
         current_q_vals = self.calculate_current_q_values(obs, actions)
         with torch.no_grad():
-            target_q_vals = self.calculate_target_q_values(
-                current_q_vals, rewards, next_obs, done
-            )
+            target_q_vals = self.calculate_target_q_values(current_q_vals, rewards, next_obs, done)
 
         loss = torch.mean((target_q_vals - current_q_vals) ** 2)
         return loss
 
-    def calculate_current_q_values(
-        self, obs: torch.Tensor, actions: torch.LongTensor
-    ) -> torch.Tensor:
+    def calculate_current_q_values(self, obs: torch.Tensor, actions: torch.LongTensor) -> torch.Tensor:
         """Computes the Q values for the actions we took"""
         q_values = self.policy_network(obs)
         actioned_q_values = self.calculate_actioned_q_values(q_values, actions)
@@ -221,9 +209,7 @@ class DQN(nn.Module):
         return target_q_vals
 
     @staticmethod
-    def calculate_actioned_q_values(
-        q_vals: torch.FloatTensor, actions: torch.LongTensor
-    ) -> torch.Tensor:
+    def calculate_actioned_q_values(q_vals: torch.FloatTensor, actions: torch.LongTensor) -> torch.Tensor:
         """Give me Q values for all actions, and the actions you took.
         I will return you only the Q values for the actions you took
         """
@@ -233,8 +219,8 @@ class DQN(nn.Module):
         """
         Play the games, updating at each step the network if not self.evaluation_mode
 
-        Verbose mode shows some stats at the end of the training, and a graph. 
-        
+        Verbose mode shows some stats at the end of the training, and a graph.
+
         You're welcome.
         """
 
@@ -295,10 +281,8 @@ class DQN(nn.Module):
     @staticmethod
     def attributes_from_experiences(
         experiences: np.ndarray,
-    ) -> Tuple[
-        torch.Tensor, torch.LongTensor, torch.FloatTensor, torch.Tensor, torch.BoolTensor
-    ]:
-        """Extracts, transforms (and loads, hehe) 
+    ) -> Tuple[torch.Tensor, torch.LongTensor, torch.FloatTensor, torch.Tensor, torch.BoolTensor,]:
+        """Extracts, transforms (and loads, hehe)
         the attributes hidden in within experiences"""
 
         obs = experiences[:, const.ATTRIBUTE_TO_INDEX["obs"]].tolist()

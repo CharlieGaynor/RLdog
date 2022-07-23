@@ -14,9 +14,7 @@ def test_copy_model():
     state_a = agent.policy_network.state_dict().__str__()
     state_b = agent.target_network.state_dict().__str__()
     assert state_a != state_b
-    agent.copy_network_over(
-        from_network=agent.policy_network, to_network=agent.target_network
-    )
+    agent.copy_network_over(from_network=agent.policy_network, to_network=agent.target_network)
     state_b = agent.target_network.state_dict().__str__()
     assert state_a == state_b
 

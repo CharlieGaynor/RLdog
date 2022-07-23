@@ -21,6 +21,4 @@ class DQN_RS(DQN):
         Returns list of experiences with dimensions [mini_batch_size]
         """
 
-        return np.array(
-            random.sample(self.transitions, k=self.mini_batch_size), dtype=object
-        )
+        return np.array(random.sample(self.transitions, k=self.mini_batch_size), dtype=object)

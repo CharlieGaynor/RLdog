@@ -1,7 +1,7 @@
 from typing import Any, Dict
 from agents.DQN_based.DQN import DQN
 from networks.base_network import baseNN
-from networks.standard_network import standardNN
+from networks.DQN_network import dqnNN
 from collections import Counter
 import torch
 
@@ -24,21 +24,17 @@ class DQN_TN(DQN):
         if self.metadata.get("test", False):
             self.target_network = testNN(self.n_obs, self.n_actions)
         else:
-            self.target_network = standardNN(self.n_obs, self.n_actions)
+            self.target_network = dqnNN(self.n_obs, self.n_actions)
         self.target_network.eval()  # We don't ever train this model, so just evaluate
 
         # Start off with the same networks
-        self.copy_network_over(
-            from_network=self.policy_network, to_network=self.target_network
-        )
+        self.copy_network_over(from_network=self.policy_network, to_network=self.target_network)
         self.tau: float = self.hyperparameters["tau"]
 
     def update_network(self) -> None:
 
         experiences = self.sample_experiences()  # shape [mini_batch_size]
-        obs, actions, rewards, next_obs, done = self.attributes_from_experiences(
-            experiences
-        )
+        obs, actions, rewards, next_obs, done = self.attributes_from_experiences(experiences)
         loss = self.compute_loss(obs, actions, rewards, next_obs, done)
         self.opt.zero_grad()
         loss.backward()
@@ -57,13 +53,8 @@ class DQN_TN(DQN):
         .
                 This helps stabilise training apparently"""
 
-        for to_network, from_network in zip(
-            self.target_network.parameters(), self.policy_network.parameters()
-        ):
-            to_network.data.copy_(
-                (1.0 - self.tau) * to_network.data.clone()
-                + self.tau * from_network.data.clone()
-            )
+        for to_network, from_network in zip(self.target_network.parameters(), self.policy_network.parameters()):
+            to_network.data.copy_((1.0 - self.tau) * to_network.data.clone() + self.tau * from_network.data.clone())
 
     def calculate_target_q_values(
         self,
