@@ -20,11 +20,13 @@ class DQN_TN(DQN):
     """
 
     def __init__(self, config: Dict[str, Any]) -> None:
+
         DQN.__init__(self, config)
+
         if self.metadata.get("test", False):
             self.target_network = testNN(self.n_obs, self.n_actions)
         else:
-            self.target_network = dqnNN(self.n_obs, self.n_actions)
+            self.target_network = dqnNN(self.n_obs, self.n_actions, self.hidden_size)  # type:ignore
         self.target_network.eval()  # We don't ever train this model, so just evaluate
 
         # Start off with the same networks

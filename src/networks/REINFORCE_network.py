@@ -1,4 +1,3 @@
-from black import out
 import torch.nn as nn
 from networks.base_network import baseNN
 
@@ -8,12 +7,12 @@ class reinforceNN(baseNN):
     Only works for Discrete actions for now
     """
 
-    def __init__(self, n_obs: int, n_actions: int) -> None:
+    def __init__(self, n_obs: int, n_actions: int, hidden_size: int) -> None:
         super(reinforceNN, self).__init__()
 
-        self.l1 = nn.Linear(n_obs, n_obs*5)
-        self.l2 = nn.Linear(n_obs*5, n_obs*5)
-        self.l3 = nn.Linear(n_obs*5, n_actions)
+        self.l1 = nn.Linear(n_obs, hidden_size)
+        self.l2 = nn.Linear(hidden_size, hidden_size)
+        self.l3 = nn.Linear(hidden_size, n_actions)
         self.activation = nn.ReLU()
         self.softmax = nn.Softmax(dim=-1)
 

@@ -1,13 +1,10 @@
-from typing import List, Any, Dict, Tuple
+from typing import Any, Dict
 import torch
 from torch import nn
 import numpy as np
-from collections import deque
-import constants as const
 from collections import Counter
 from networks.REINFORCE_network import reinforceNN
-from networks.test_network import testNN
-from tools.plotters import plot_results
+from tools.plotters import plot_results  # type: ignore
 
 # at the minute using epislon greedy - could generalise this out into a seperate class
 # priority is having mini batches
@@ -24,14 +21,16 @@ class REINFORCE(nn.Module):
         super().__init__()
 
         self.metadata = config["metadata"]
+        self.hyperparameters = config["hyperparameters"]
+
         self.n_actions = self.metadata["n_actions"]
         self.n_obs = self.metadata["n_obs"]
-        self.policy_network = reinforceNN(self.n_obs, self.n_actions)  # type: ignore
+        hidden_size = self.hyperparameters["hidden_size"]
+        self.policy_network = reinforceNN(self.n_obs, self.n_actions, hidden_size)  # type: ignore
         self.env = self.metadata["env"]
         self.state_type = self.metadata["state_type"]
         self.one_hot_encoding_basepoints = self.metadata.get("one_hot_encoding_basepoints", [])
 
-        self.hyperparameters = config["hyperparameters"]
         self.opt = torch.optim.Adam(self.policy_network.parameters(), lr=self.hyperparameters["lr"])
         self.max_games: int = self.hyperparameters["max_games"]
         self.action_counts = {i: 0 for i in range(self.n_actions)}
@@ -39,7 +38,7 @@ class REINFORCE(nn.Module):
         self.state_is_discrete: bool = self.state_type == "DISCRETE"
         self.gamma = self.hyperparameters["gamma"]
 
-        self.transitions: list[tuple[torch.FloatTensor, int, float]] = []
+        self.transitions: list[tuple[torch.Tensor, int, float]] = []
         self.reward_averages: list[list[float]] = []
         self.evaluation_reward_averages: list[list[float]] = []
         self.evaluation_mode = False
@@ -51,6 +50,7 @@ class REINFORCE(nn.Module):
         next_obs = self.format_obs(next_obs_unformatted)
         done = False
         rewards = []
+        reward: float = 0
 
         while not done:
             obs = next_obs
@@ -76,7 +76,7 @@ class REINFORCE(nn.Module):
         with torch.no_grad():
             probabilities = self.policy_network(state)
 
-        numpy_probabilities: np.array = probabilities.data.flatten().numpy()
+        numpy_probabilities: np.ndarray = probabilities.data.flatten().numpy()
 
         if self.evaluation_mode:
             trimmed_probs = np.where(numpy_probabilities < 0.05, 0, numpy_probabilities)
@@ -112,27 +112,24 @@ class REINFORCE(nn.Module):
 
         discounted_rewards = self.compute_discounted_rewards(rewards)
 
-        loss = torch.sum(torch.log(actioned_probabilities) * discounted_rewards)
+        loss = torch.mean(-1.0 * torch.log(actioned_probabilities) * discounted_rewards)
         return loss
 
     def compute_discounted_rewards(self, rewards: torch.FloatTensor) -> torch.FloatTensor:
+        """Calculate the sum_i^{len(rewards)}r * gamma^i for each time step i"""
 
         discounted_rewards = []
 
         for i in range(len(rewards)):
             total = 0
             for j in range(i, len(rewards)):
-                total += rewards[j] * self.gamma ** (j - 1)
-
+                total += rewards[j] * self.gamma ** (j)
             discounted_rewards.append(total)
 
-        max_reward = max(discounted_rewards)
+        discounted_rewards_tensor = torch.FloatTensor(discounted_rewards)
+        discounted_rewards_tensor /= discounted_rewards_tensor.std() + 1e-3  # type: ignore
 
-        return (
-            torch.FloatTensor(discounted_rewards) / max_reward
-            if max_reward != torch.tensor(0.0)
-            else torch.FloatTensor(discounted_rewards)
-        )
+        return discounted_rewards_tensor
 
     def play_games(self, games_to_play: int = 0, verbose: bool = False) -> None:
         """Play the games, updating at each step the network if not self.evaluation_mode

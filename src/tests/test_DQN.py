@@ -4,7 +4,7 @@ import numpy as np
 import config as config
 from agents.DQN_based.DQN import DQN
 
-test_config = config.config["TEST"]
+test_config = config.config["TEST"]["DQN"]
 
 agent = DQN(test_config)
 agent.epsilon = 0.5

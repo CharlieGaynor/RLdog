@@ -7,7 +7,7 @@ import constants as const
 from collections import Counter
 from networks.DQN_network import dqnNN
 from networks.test_network import testNN
-from tools.plotters import plot_results
+from tools.plotters import plot_results  # type: ignore
 
 # at the minute using epislon greedy - could generalise this out into a seperate class
 # priority is having mini batches
@@ -28,16 +28,18 @@ class DQN(nn.Module):
         super().__init__()
 
         self.metadata = config["metadata"]
+        self.hyperparameters = config["hyperparameters"]
+
         self.n_actions = self.metadata["n_actions"]
         self.n_obs = self.metadata["n_obs"]
         if self.metadata.get("test", False):
             self.policy_network = testNN(self.n_obs, self.n_actions)
         else:
-            self.policy_network = dqnNN(self.n_obs, self.n_actions)  # type: ignore
+            self.hidden_size = self.hyperparameters["hidden_size"]
+            self.policy_network = dqnNN(self.n_obs, self.n_actions, self.hidden_size)  # type: ignore
         self.env = self.metadata["env"]
         self.state_type = self.metadata["state_type"]
 
-        self.hyperparameters = config["hyperparameters"]
         self.opt = torch.optim.Adam(self.policy_network.parameters(), lr=self.hyperparameters["lr"])
         self.epsilon = 1.0
         self.max_games: int = self.hyperparameters["max_games"]
@@ -281,7 +283,7 @@ class DQN(nn.Module):
     @staticmethod
     def attributes_from_experiences(
         experiences: np.ndarray,
-    ) -> Tuple[torch.Tensor, torch.LongTensor, torch.FloatTensor, torch.Tensor, torch.BoolTensor,]:
+    ) -> Tuple[torch.Tensor, torch.LongTensor, torch.FloatTensor, torch.Tensor, torch.BoolTensor]:
         """Extracts, transforms (and loads, hehe)
         the attributes hidden in within experiences"""
 

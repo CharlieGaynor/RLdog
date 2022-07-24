@@ -1,7 +1,8 @@
 import config as config
 from agents.DQN_based.DQN_TN import DQN_TN
 
-test_config = config.config["TEST"]
+
+test_config = config.config["TEST"]["DQN"]
 
 agent = DQN_TN(test_config)
 agent.epsilon = 0.5
